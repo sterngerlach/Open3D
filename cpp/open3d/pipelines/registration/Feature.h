@@ -73,6 +73,17 @@ std::shared_ptr<Feature> ComputeFPFHFeature(
         const geometry::KDTreeSearchParam &search_param =
                 geometry::KDTreeSearchParamKNN());
 
+// Compute SPFH features for a point cloud (useful for profiling)
+std::shared_ptr<Feature> ComputeSPFHFeatureEx(
+    const geometry::PointCloud& point_cloud,
+    const Eigen::MatrixXi& knn_indices);
+
+// Compute FPFH features for a point cloud (useful for profiling)
+std::shared_ptr<Feature> ComputeFPFHFeatureEx(
+    const Feature& spfh_features,
+    const Eigen::MatrixXi& knn_indices,
+    const Eigen::MatrixXd& knn_distances);
+
 }  // namespace registration
 }  // namespace pipelines
 }  // namespace open3d

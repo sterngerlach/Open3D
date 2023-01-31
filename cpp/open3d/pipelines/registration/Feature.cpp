@@ -160,6 +160,153 @@ std::shared_ptr<Feature> ComputeFPFHFeature(
     return feature;
 }
 
+// Compute SPFH features for a point cloud (useful for profiling)
+// Eigen uses the column-major matrices
+// `point_cloud` is of size [3, N]
+// `knn_indices` is of size [K, N]
+// Output is of size [33, N]
+// N is the number of points
+// K is the number of neighbors
+std::shared_ptr<Feature> ComputeSPFHFeatureEx(
+    const geometry::PointCloud& point_cloud,
+    const Eigen::MatrixXi& knn_indices)
+{
+    const int num_points = static_cast<int>(point_cloud.points_.size());
+
+    if (!point_cloud.HasNormals()) {
+        utility::LogError("Point cloud has no normal");
+        return nullptr;
+    }
+
+    if (knn_indices.cols() != num_points) {
+        utility::LogError("Number of points in `knn_indices` should be the "
+                          "same as the number of points in `point_cloud`");
+        return nullptr;
+    }
+
+    if (knn_indices.rows() <= 1) {
+        utility::LogError("Number of neighbors should be greater than 1");
+        return nullptr;
+    }
+
+    auto feature = std::make_shared<Feature>();
+    feature->Resize(33, num_points);
+
+    const double hist_incr = 100.0 / static_cast<double>(
+        knn_indices.rows() - 1);
+
+#pragma omp parallel for schedule(static) \
+    num_threads(utility::EstimateMaxThreads())
+    for (int i = 0; i < num_points; ++i) {
+        const auto& point = point_cloud.points_[i];
+        const auto& normal = point_cloud.normals_[i];
+        // Skip the point itself
+        for (int k = 1; k < knn_indices.rows(); ++k) {
+            const auto pair_feature = ComputePairFeatures(
+                point, normal,
+                point_cloud.points_[knn_indices(k, i)],
+                point_cloud.normals_[knn_indices(k, i)]);
+
+            int h_index = static_cast<int>(std::floor(
+                11 * (pair_feature(0) + M_PI) / (2.0 * M_PI)));
+            h_index = std::max(0, std::min(10, h_index));
+            feature->data_(h_index, i) += hist_incr;
+
+            h_index = static_cast<int>(std::floor(
+                11 * (pair_feature(1) + 1.0) * 0.5));
+            h_index = std::max(0, std::min(10, h_index));
+            feature->data_(h_index + 11, i) += hist_incr;
+
+            h_index = static_cast<int>(std::floor(
+                11 * (pair_feature(2) + 1.0) * 0.5));
+            h_index = std::max(0, std::min(10, h_index));
+            feature->data_(h_index + 22, i) += hist_incr;
+        }
+    }
+
+    return feature;
+}
+
+// Compute FPFH features for a point cloud (useful for profiling)
+// Eigen uses the column-major matrices
+// `spfh_features` is of size [33, N]
+// `knn_indices` is of size [K, N]
+// `knn_distances` is of size [K, N]
+// Output is of size [33, N]
+// N is the number of points
+// K is the number of neighbors
+std::shared_ptr<Feature> ComputeFPFHFeatureEx(
+    const Feature& spfh_features,
+    const Eigen::MatrixXi& knn_indices,
+    const Eigen::MatrixXd& knn_distances)
+{
+    const int num_points = static_cast<int>(spfh_features.Num());
+
+    if (spfh_features.Dimension() != 33) {
+        utility::LogError("Number of SPFH feature dimensions should be 33");
+        return nullptr;
+    }
+
+    if (knn_indices.cols() != num_points) {
+        utility::LogError("Number of points in `knn_indices` should be the "
+                          "same as the number of points in `point_cloud`");
+        return nullptr;
+    }
+
+    if (knn_indices.rows() <= 1) {
+        utility::LogError("Number of neighbors should be greater than 1");
+        return nullptr;
+    }
+
+    if (knn_distances.cols() != num_points) {
+        utility::LogError("Number of points in `knn_distances` should be the "
+                          "same as the number of points in `point_cloud`");
+        return nullptr;
+    }
+
+    if (knn_distances.rows() != knn_indices.rows()) {
+        utility::LogError("Number of neighbors in `knn_distances` should be "
+                          "the same as the number of neighbors in "
+                          "`knn_indices`");
+        return nullptr;
+    }
+
+    auto feature = std::make_shared<Feature>();
+    feature->Resize(33, num_points);
+
+#pragma omp parallel for schedule(static) \
+    num_threads(utility::EstimateMaxThreads())
+    for (int i = 0; i < num_points; ++i) {
+        double sum[3] = { 0.0, 0.0, 0.0 };
+
+        // Skip the point itself
+        for (int k = 1; k < knn_indices.rows(); ++k) {
+            const double dist = knn_distances(k, i);
+            if (dist == 0.0)
+                continue;
+
+            const int knn_idx = knn_indices(k, i);
+            for (int j = 0; j < 33; ++j) {
+                const double spfh_val = spfh_features.data_(j, knn_idx);
+                const double val = spfh_val / dist;
+                sum[j / 11] += val;
+                feature->data_(j, i) += val;
+            }
+        }
+
+        for (int j = 0; j < 3; ++j)
+            if (sum[j] != 0.0)
+                sum[j] = 100.0 / sum[j];
+
+        for (int j = 0; j < 33; ++j) {
+            feature->data_(j, i) *= sum[j / 11];
+            feature->data_(j, i) += spfh_features.data_(j, i);
+        }
+    }
+
+    return feature;
+}
+
 }  // namespace registration
 }  // namespace pipelines
 }  // namespace open3d
