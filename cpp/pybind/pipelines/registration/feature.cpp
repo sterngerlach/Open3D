@@ -68,10 +68,28 @@ void pybind_feature_methods(py::module &m) {
     m.def("compute_fpfh_feature", &ComputeFPFHFeature,
           "Function to compute FPFH feature for a point cloud", "input"_a,
           "search_param"_a);
+    m.def("compute_spfh_feature_ex", &ComputeSPFHFeatureEx,
+          "Function to compute SPFH features from a point cloud and "
+          "K-nearest neighbor indices for each point",
+          "point_cloud"_a, "knn_indices"_a);
+    m.def("compute_fpfh_feature_ex", &ComputeFPFHFeatureEx,
+          "Function to compute FPFH features from a point cloud and "
+          "K-nearest neighbor indices for each point",
+          "spfh_features"_a, "knn_indices"_a, "knn_distances"_a);
+
     docstring::FunctionDocInject(
             m, "compute_fpfh_feature",
             {{"input", "The Input point cloud."},
              {"search_param", "KDTree KNN search parameter."}});
+    docstring::FunctionDocInject(
+            m, "compute_spfh_feature_ex",
+            {{"point_cloud", "Input point cloud."},
+             {"knn_indices", "K-nearest neighbor indices."}});
+    docstring::FunctionDocInject(
+            m, "compute_fpfh_feature_ex",
+            {{"spfh_features", "SPFH features."},
+             {"knn_indices", "K-nearest neighbor indices."},
+             {"knn_distances", "K-nearest neighbor distances."}});
 }
 
 }  // namespace registration
