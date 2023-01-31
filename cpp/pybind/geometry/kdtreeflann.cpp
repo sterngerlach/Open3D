@@ -110,6 +110,7 @@ void pybind_kdtreeflann(py::module &m) {
     static const std::unordered_map<std::string, std::string>
             map_kd_tree_flann_method_docs = {
                     {"query", "The input query point."},
+                    {"queries", "The input query points."},
                     {"radius", "Search radius."},
                     {"max_nn",
                      "At maximum, ``max_nn`` neighbors will be searched."},
@@ -254,7 +255,59 @@ void pybind_kdtreeflann(py::module &m) {
                                     "search_hybrid_vector_xd() error!");
                         return std::make_tuple(k, indices, distance2);
                     },
-                    "query"_a, "radius"_a, "max_nn"_a);
+                    "query"_a, "radius"_a, "max_nn"_a)
+            .def(
+                    "batched_search_knn_3d",
+                    [](const KDTreeFlann& tree, const Eigen::Matrix3Xd& queries,
+                       const int knn) {
+                        Eigen::MatrixXi indices;
+                        Eigen::MatrixXd distance2;
+                        if (!tree.BatchedSearchKNN<Eigen::Matrix3Xd>(
+                            queries, knn, indices, distance2))
+                            throw std::runtime_error(
+                                "batched_search_knn_3d() failed");
+                        return std::make_tuple(indices, distance2);
+                    },
+                    "queries"_a, "knn"_a)
+            .def(
+                    "batched_search_knn_3d_omp",
+                    [](const KDTreeFlann& tree, const Eigen::Matrix3Xd& queries,
+                       const int knn) {
+                        Eigen::MatrixXi indices;
+                        Eigen::MatrixXd distance2;
+                        if (!tree.BatchedSearchKNNOpenMP<Eigen::Matrix3Xd>(
+                            queries, knn, indices, distance2))
+                            throw std::runtime_error(
+                                "batched_search_knn_3d_omp() failed");
+                        return std::make_tuple(indices, distance2);
+                    },
+                    "queries"_a, "knn"_a)
+            .def(
+                    "batched_search_knn_xd",
+                    [](const KDTreeFlann& tree, const Eigen::MatrixXd& queries,
+                       const int knn) {
+                        Eigen::MatrixXi indices;
+                        Eigen::MatrixXd distance2;
+                        if (!tree.BatchedSearchKNN<Eigen::MatrixXd>(
+                            queries, knn, indices, distance2))
+                            throw std::runtime_error(
+                                "batched_search_knn_xd() failed");
+                        return std::make_tuple(indices, distance2);
+                    },
+                    "queries"_a, "knn"_a)
+            .def(
+                    "batched_search_knn_xd_omp",
+                    [](const KDTreeFlann& tree, const Eigen::MatrixXd& queries,
+                       const int knn) {
+                        Eigen::MatrixXi indices;
+                        Eigen::MatrixXd distance2;
+                        if (!tree.BatchedSearchKNNOpenMP<Eigen::MatrixXd>(
+                            queries, knn, indices, distance2))
+                            throw std::runtime_error(
+                                "batched_search_knn_xd_omp() failed");
+                        return std::make_tuple(indices, distance2);
+                    },
+                    "queries"_a, "knn"_a);
     docstring::ClassMethodDocInject(m, "KDTreeFlann", "search_hybrid_vector_3d",
                                     map_kd_tree_flann_method_docs);
     docstring::ClassMethodDocInject(m, "KDTreeFlann", "search_hybrid_vector_xd",
@@ -277,6 +330,19 @@ void pybind_kdtreeflann(py::module &m) {
                                     map_kd_tree_flann_method_docs);
     docstring::ClassMethodDocInject(m, "KDTreeFlann", "set_matrix_data",
                                     map_kd_tree_flann_method_docs);
+
+    docstring::ClassMethodDocInject(
+        m, "KDTreeFlann", "batched_search_knn_3d",
+        map_kd_tree_flann_method_docs);
+    docstring::ClassMethodDocInject(
+        m, "KDTreeFlann", "batched_search_knn_3d_omp",
+        map_kd_tree_flann_method_docs);
+    docstring::ClassMethodDocInject(
+        m, "KDTreeFlann", "batched_search_knn_xd",
+        map_kd_tree_flann_method_docs);
+    docstring::ClassMethodDocInject(
+        m, "KDTreeFlann", "batched_search_knn_xd_omp",
+        map_kd_tree_flann_method_docs);
 }
 
 }  // namespace geometry
