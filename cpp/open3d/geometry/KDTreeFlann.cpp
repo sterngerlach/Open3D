@@ -37,6 +37,7 @@
 #include "open3d/geometry/PointCloud.h"
 #include "open3d/geometry/TriangleMesh.h"
 #include "open3d/utility/Logging.h"
+#include "open3d/utility/Parallel.h"
 
 namespace open3d {
 namespace geometry {
@@ -184,6 +185,100 @@ int KDTreeFlann::SearchHybrid(const T &query,
     return k;
 }
 
+// Batched K-nearest neighbor search for efficiency
+// Eigen uses the column-major matrices
+// `queries` is of size [D, N]
+// `indices` is of size [K, N]
+// `distance2` is of size [K, N]
+// N is the number of queries
+// D is the number of dimensions
+// K is the number of neighbors
+template <typename T>
+bool KDTreeFlann::BatchedSearchKNN(const T& queries,
+                                   const int knn,
+                                   Eigen::MatrixXi& indices,
+                                   Eigen::MatrixXd& distance2) const
+{
+    using IndexVector = Eigen::Matrix<Eigen::Index, Eigen::Dynamic, 1>;
+
+    const auto data_dim = static_cast<std::size_t>(queries.rows());
+
+    if (this->data_.empty() || this->dataset_size_ <= 0 ||
+        data_dim != this->dimension_ || knn < 0) {
+        return false;
+    }
+
+    indices.resize(knn, queries.cols());
+    distance2.resize(knn, queries.cols());
+
+    std::vector<Eigen::Index> query_indices;
+    std::vector<double> query_distance2;
+    query_indices.resize(knn);
+    query_distance2.resize(knn);
+
+    for (int i = 0; i < queries.cols(); ++i) {
+        const int k = this->nanoflann_index_->index->knnSearch(
+            queries.col(i).data(), knn,
+            query_indices.data(), query_distance2.data());
+        indices.col(i).head(k) = Eigen::Map<IndexVector>(
+            query_indices.data(), k).cast<int>();
+        distance2.col(i).head(k) = Eigen::Map<Eigen::VectorXd>(
+            query_distance2.data(), k);
+    }
+
+    return true;
+}
+
+// Batched K-nearest neighbor search for efficiency (with OpenMP)
+// Eigen uses the column-major matrices
+// `queries` is of size [D, N]
+// `indices` is of size [K, N]
+// `distance2` is of size [K, N]
+// N is the number of queries
+// D is the number of dimensions
+// K is the number of neighbors
+template <typename T>
+bool KDTreeFlann::BatchedSearchKNNOpenMP(const T& queries,
+                                         const int knn,
+                                         Eigen::MatrixXi& indices,
+                                         Eigen::MatrixXd& distance2) const
+{
+    using IndexVector = Eigen::Matrix<Eigen::Index, Eigen::Dynamic, 1>;
+
+    const auto data_dim = static_cast<std::size_t>(queries.rows());
+
+    if (this->data_.empty() || this->dataset_size_ <= 0 ||
+        data_dim != this->dimension_ || knn < 0) {
+        return false;
+    }
+
+    indices.resize(knn, queries.cols());
+    distance2.resize(knn, queries.cols());
+
+    std::vector<Eigen::Index> query_indices;
+    std::vector<double> query_distance2;
+    query_indices.resize(knn);
+    query_distance2.resize(knn);
+
+    // Copy constructor is called when initializing `query_indices` and
+    // `query_distance2` in each thread
+
+#pragma omp parallel for schedule(static) \
+    num_threads(utility::EstimateMaxThreads()) \
+    firstprivate(query_indices, query_distance2)
+    for (int i = 0; i < queries.cols(); ++i) {
+        const int k = this->nanoflann_index_->index->knnSearch(
+            queries.col(i).data(), knn,
+            query_indices.data(), query_distance2.data());
+        indices.col(i).head(k) = Eigen::Map<IndexVector>(
+            query_indices.data(), k).cast<int>();
+        distance2.col(i).head(k) = Eigen::Map<Eigen::VectorXd>(
+            query_distance2.data(), k);
+    }
+
+    return true;
+}
+
 bool KDTreeFlann::SetRawData(const Eigen::Map<const Eigen::MatrixXd> &data) {
     dimension_ = data.rows();
     dataset_size_ = data.cols();
@@ -244,6 +339,28 @@ template int KDTreeFlann::SearchHybrid<Eigen::VectorXd>(
         int max_nn,
         std::vector<int> &indices,
         std::vector<double> &distance2) const;
+
+template bool KDTreeFlann::BatchedSearchKNN<Eigen::Matrix3Xd>(
+    const Eigen::Matrix3Xd& queries,
+    const int knn,
+    Eigen::MatrixXi& indices,
+    Eigen::MatrixXd& distance2) const;
+template bool KDTreeFlann::BatchedSearchKNN<Eigen::MatrixXd>(
+    const Eigen::MatrixXd& queries,
+    const int knn,
+    Eigen::MatrixXi& indices,
+    Eigen::MatrixXd& distance2) const;
+
+template bool KDTreeFlann::BatchedSearchKNNOpenMP<Eigen::Matrix3Xd>(
+    const Eigen::Matrix3Xd& queries,
+    const int knn,
+    Eigen::MatrixXi& indices,
+    Eigen::MatrixXd& distance2) const;
+template bool KDTreeFlann::BatchedSearchKNNOpenMP<Eigen::MatrixXd>(
+    const Eigen::MatrixXd& queries,
+    const int knn,
+    Eigen::MatrixXi& indices,
+    Eigen::MatrixXd& distance2) const;
 
 }  // namespace geometry
 }  // namespace open3d

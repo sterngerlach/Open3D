@@ -108,6 +108,20 @@ public:
                      std::vector<int> &indices,
                      std::vector<double> &distance2) const;
 
+    // Batched K-nearest neighbor search for efficiency
+    template <typename T>
+    bool BatchedSearchKNN(const T& queries,
+                          const int knn,
+                          Eigen::MatrixXi& indices,
+                          Eigen::MatrixXd& distance2) const;
+
+    // Batched K-nearest neighbor search for efficiency (with OpenMP)
+    template <typename T>
+    bool BatchedSearchKNNOpenMP(const T& queries,
+                                const int knn,
+                                Eigen::MatrixXi& indices,
+                                Eigen::MatrixXd& distance2) const;
+
 private:
     /// \brief Sets the KDTree data from the data provided by the other methods.
     ///
