@@ -129,6 +129,13 @@ void pybind_pointcloud(py::module &m) {
                  "normals exist",
                  "search_param"_a = KDTreeSearchParamKNN(),
                  "fast_normal_computation"_a = true)
+            .def("estimate_normals_ex", &PointCloud::EstimateNormalsEx,
+                 "Function to compute the normals of a point cloud.",
+                 "kd_tree"_a, "search_param"_a = KDTreeSearchParamKNN(),
+                 "fast_normal_computation"_a = true)
+            .def("estimate_normals_knn", &PointCloud::EstimateNormalsKNN,
+                 "Function to compute the normals of a point cloud.",
+                 "knn_indices"_a, "fast_normal_computation"_a = true)
             .def("orient_normals_to_align_with_direction",
                  &PointCloud::OrientNormalsToAlignWithDirection,
                  "Function to orient the normals of a point cloud",
@@ -158,6 +165,29 @@ void pybind_pointcloud(py::module &m) {
                  "Function to compute the covariance matrix for each point "
                  "in the point cloud",
                  "search_param"_a = KDTreeSearchParamKNN())
+            .def_static(
+                    "estimate_point_covariances_ex",
+                    &PointCloud::EstimatePerPointCovariancesEx,
+                    "Static function to compute the covariance matrix for "
+                    "each point of a point cloud.",
+                    "point_cloud"_a, "kd_tree"_a,
+                    "search_param"_a = KDTreeSearchParamKNN())
+            .def("estimate_covariances_ex",
+                 &PointCloud::EstimateCovariancesEx,
+                 "Function to compute the covariance matrix for each point "
+                 "of a point cloud.",
+                 "kd_tree"_a, "search_param"_a = KDTreeSearchParamKNN())
+            .def_static(
+                    "estimate_point_covariances_knn",
+                    &PointCloud::EstimatePerPointCovariancesKNN,
+                    "Static function to compute the covariance matrix for "
+                    "each point of a point cloud.",
+                    "point_cloud"_a, "knn_indices"_a)
+            .def("estimate_covariances_knn",
+                 &PointCloud::EstimateCovariancesKNN,
+                 "Function to compute the covariance matrix for each point "
+                 "of a point cloud.",
+                 "knn_indices"_a)
             .def("compute_mean_and_covariance",
                  &PointCloud::ComputeMeanAndCovariance,
                  "Function to compute the mean and covariance matrix of a "
@@ -301,6 +331,21 @@ camera. Given depth value d at (u, v) image coordinate, the corresponding 3d poi
               "extract the eigenvector from the covariance matrix. This is "
               "faster, but is not as numerical stable."}});
     docstring::ClassMethodDocInject(
+            m, "PointCloud", "estimate_normals_ex",
+            {{"kd_tree", "K-D tree of the input point cloud."},
+             {"search_param", "K-D tree search parameter."},
+             {"fast_normal_computation",
+              "If true, the normal estimation uses a non-iterative method to "
+              "extract the eigenvector from the covariance matrix. This is "
+              "faster, but is not as numerical stable."}});
+    docstring::ClassMethodDocInject(
+            m, "PointCloud", "estimate_normals_knn",
+            {{"knn_indices", "K-nearest neighbor indices."},
+             {"fast_normal_computation",
+              "If true, the normal estimation uses a non-iterative method to "
+              "extract the eigenvector from the covariance matrix. This is "
+              "faster, but is not as numerical stable."}});
+    docstring::ClassMethodDocInject(
             m, "PointCloud", "orient_normals_to_align_with_direction",
             {{"orientation_reference",
               "Normals are oriented with respect to orientation_reference."}});
@@ -325,6 +370,22 @@ camera. Given depth value d at (u, v) image coordinate, the corresponding 3d poi
             m, "PointCloud", "estimate_covariances",
             {{"search_param",
               "The KDTree search parameters for neighborhood search."}});
+    docstring::ClassMethodDocInject(
+            m, "PointCloud", "estimate_point_covariances_ex",
+            {{"point_cloud", "Input point cloud."},
+             {"kd_tree", "K-D tree of the input point cloud."},
+             {"search_param", "K-D tree search parameter."}});
+    docstring::ClassMethodDocInject(
+            m, "PointCloud", "estimate_covariances_ex",
+            {{"kd_tree", "K-D tree of the input point cloud."},
+             {"search_param", "K-D tree search parameter."}});
+    docstring::ClassMethodDocInject(
+            m, "PointCloud", "estimate_point_covariances_knn",
+            {{"point_cloud", "Input point cloud."},
+             {"knn_indices", "K-nearest neighbor indices."}});
+    docstring::ClassMethodDocInject(
+            m, "PointCloud", "estimate_covariances_knn",
+            {{"knn_indices", "K-nearest neighbor indices."}});
     docstring::ClassMethodDocInject(m, "PointCloud",
                                     "compute_mean_and_covariance");
     docstring::ClassMethodDocInject(m, "PointCloud",
