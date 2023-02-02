@@ -141,6 +141,7 @@ openblas_build() {
                  --build-arg CCACHE_TAR_NAME="${CCACHE_TAR_NAME}" \
                  --build-arg PYTHON_VERSION="${PYTHON_VERSION}" \
                  --build-arg DEVELOPER_BUILD="${DEVELOPER_BUILD}" \
+                 --cpuset-cpus="0-30" \
                  -t "${DOCKER_TAG}" \
                  -f docker/Dockerfile.openblas .
     popd
