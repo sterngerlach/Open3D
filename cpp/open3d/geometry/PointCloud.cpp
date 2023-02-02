@@ -622,6 +622,89 @@ void PointCloud::EstimateCovariances(
     this->covariances_ = EstimatePerPointCovariances(*this, search_param);
 }
 
+std::vector<Eigen::Matrix3d> PointCloud::EstimatePerPointCovariancesEx(
+    const PointCloud& point_cloud,
+    const KDTreeFlann& kd_tree,
+    const KDTreeSearchParam& search_param)
+{
+    const auto& points = point_cloud.points_;
+    const int num_points = static_cast<int>(points.size());
+
+    std::vector<Eigen::Matrix3d> covariances;
+    covariances.resize(points.size());
+
+#pragma omp parallel for schedule(static) \
+    num_threads(utility::EstimateMaxThreads())
+    for (int i = 0; i < num_points; ++i) {
+        std::vector<int> indices;
+        std::vector<double> distance2;
+        if (kd_tree.Search(points[i], search_param, indices, distance2) >= 3) {
+            const auto covariance = utility::ComputeCovariance(points, indices);
+            if (point_cloud.HasCovariances() && covariance.isIdentity(1e-4)) {
+                covariances[i] = point_cloud.covariances_[i];
+            } else {
+                covariances[i] = covariance;
+            }
+        } else {
+            covariances[i] = Eigen::Matrix3d::Identity();
+        }
+    }
+
+    return covariances;
+}
+
+void PointCloud::EstimateCovariancesEx(
+    const KDTreeFlann& kd_tree,
+    const KDTreeSearchParam& search_param)
+{
+    this->covariances_ = EstimatePerPointCovariancesEx(
+        *this, kd_tree, search_param);
+}
+
+std::vector<Eigen::Matrix3d> PointCloud::EstimatePerPointCovariancesKNN(
+    const PointCloud& point_cloud,
+    const Eigen::MatrixXi& knn_indices)
+{
+    const auto& points = point_cloud.points_;
+    const int num_points = static_cast<int>(points.size());
+    const int num_neighbors = static_cast<int>(knn_indices.rows());
+
+    if (knn_indices.rows() < 3) {
+        utility::LogError("Number of neighbors should be greater than or "
+                          "equal to 3");
+        return std::vector<Eigen::Matrix3d> { };
+    }
+
+    if (knn_indices.cols() != num_points) {
+        utility::LogError("Number of points in `knn_indices` should be the "
+                          "same as the number of points in `point_cloud`");
+        return std::vector<Eigen::Matrix3d> { };
+    }
+
+    std::vector<Eigen::Matrix3d> covariances;
+    covariances.resize(points.size());
+
+#pragma omp parallel for schedule(static) \
+    num_threads(utility::EstimateMaxThreads())
+    for (int i = 0; i < num_points; ++i) {
+        const auto* query_knn_indices = knn_indices.col(i).data();
+        const auto covariance = utility::ComputeCovariance(
+            points, query_knn_indices, num_neighbors);
+        if (point_cloud.HasCovariances() && covariance.isIdentity(1e-4)) {
+            covariances[i] = point_cloud.covariances_[i];
+        } else {
+            covariances[i] = covariance;
+        }
+    }
+
+    return covariances;
+}
+
+void PointCloud::EstimateCovariancesKNN(const Eigen::MatrixXi& knn_indices)
+{
+    this->covariances_ = EstimatePerPointCovariancesKNN(*this, knn_indices);
+}
+
 std::tuple<Eigen::Vector3d, Eigen::Matrix3d>
 PointCloud::ComputeMeanAndCovariance() const {
     if (IsEmpty()) {

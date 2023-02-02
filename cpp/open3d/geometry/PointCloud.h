@@ -32,6 +32,7 @@
 #include <vector>
 
 #include "open3d/geometry/Geometry3D.h"
+#include "open3d/geometry/KDTreeFlann.h"
 #include "open3d/geometry/KDTreeSearchParam.h"
 #include "open3d/utility/Optional.h"
 
@@ -283,6 +284,37 @@ public:
     /// search.
     void EstimateCovariances(
             const KDTreeSearchParam &search_param = KDTreeSearchParamKNN());
+
+    /// \brief Static function to compute the covariance matrix for each point
+    /// of a point cloud.
+    /// \param point_cloud Input point cloud
+    /// \param kd_tree K-D tree of the input point cloud
+    /// \param search_param K-D tree search parameter
+    static std::vector<Eigen::Matrix3d> EstimatePerPointCovariancesEx(
+        const PointCloud& point_cloud,
+        const KDTreeFlann& kd_tree,
+        const KDTreeSearchParam& search_param = KDTreeSearchParamKNN());
+
+    /// \brief Function to compute the covariance matrix for each point of a
+    /// point cloud.
+    /// \param kd_tree K-D tree of the input point cloud
+    /// \param search_param K-D tree search parameter
+    void EstimateCovariancesEx(
+        const KDTreeFlann& kd_tree,
+        const KDTreeSearchParam& search_param = KDTreeSearchParamKNN());
+
+    /// \brief Static function to compute the covariance matrix for each point
+    /// of a point cloud.
+    /// \param point_cloud Input point cloud
+    /// \param knn_indices K-nearest neighbor indices
+    static std::vector<Eigen::Matrix3d> EstimatePerPointCovariancesKNN(
+        const PointCloud& point_cloud,
+        const Eigen::MatrixXi& knn_indices);
+
+    /// \brief Function to compute the covariance matrix for each point of a
+    /// point cloud.
+    /// \param knn_indices K-nearest neighbor indices
+    void EstimateCovariancesKNN(const Eigen::MatrixXi& knn_indices);
 
     /// Function to compute the mean and covariance matrix
     /// of a point cloud.
