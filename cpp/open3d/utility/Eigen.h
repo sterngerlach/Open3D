@@ -142,5 +142,19 @@ template <typename IdxType>
 std::tuple<Eigen::Vector3d, Eigen::Matrix3d> ComputeMeanAndCovariance(
         const std::vector<Eigen::Vector3d> &points,
         const std::vector<IdxType> &indices);
+
+/// Function to compute the covariance matrix of a set of points.
+template <typename IdxType>
+Eigen::Matrix3d ComputeCovariance(const std::vector<Eigen::Vector3d>& points,
+                                  const IdxType* indices,
+                                  const int num_indices);
+
+/// Function to compute the mean and covariance matrix of a set of points.
+template <typename IdxType>
+std::tuple<Eigen::Vector3d, Eigen::Matrix3d> ComputeMeanAndCovariance(
+    const std::vector<Eigen::Vector3d>& points,
+    const IdxType* indices,
+    const int num_indices);
+
 }  // namespace utility
 }  // namespace open3d
