@@ -233,6 +233,19 @@ public:
             const KDTreeSearchParam &search_param = KDTreeSearchParamKNN(),
             bool fast_normal_computation = true);
 
+    /// \brief Function to compute the normals of a point cloud.
+    /// \param kd_tree K-D tree of the input point cloud
+    /// \param search_param K-D tree search parameter
+    void EstimateNormalsEx(
+        const KDTreeFlann& kd_tree,
+        const KDTreeSearchParam& search_param = KDTreeSearchParamKNN(),
+        const bool fast_normal_computation = true);
+
+    /// \brief Function to compute the normals of a point cloud.
+    /// \param knn_indices K-nearest neighbor indices
+    void EstimateNormalsKNN(const Eigen::MatrixXi& knn_indices,
+                            const bool fast_normal_computation = true);
+
     /// \brief Function to orient the normals of a point cloud.
     ///
     /// \param orientation_reference Normals are oriented with respect to

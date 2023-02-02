@@ -335,6 +335,78 @@ void PointCloud::EstimateNormals(
     }
 }
 
+void PointCloud::EstimateNormalsEx(const KDTreeFlann& kd_tree,
+                                   const KDTreeSearchParam& search_param,
+                                   const bool fast_normal_computation)
+{
+    const int num_points = static_cast<int>(this->points_.size());
+
+    const bool has_normal = this->HasNormals();
+    if (!has_normal) {
+        this->normals_.resize(this->points_.size());
+    }
+
+    std::vector<Eigen::Matrix3d> covariances;
+    if (!this->HasCovariances()) {
+        covariances = EstimatePerPointCovariancesEx(
+            *this, kd_tree, search_param);
+    } else {
+        covariances = this->covariances_;
+    }
+
+#pragma omp parallel for schedule(static) \
+    num_threads(utility::EstimateMaxThreads())
+    for (int i = 0; i < num_points; ++i) {
+        auto normal = ComputeNormal(covariances[i], fast_normal_computation);
+        if (normal.squaredNorm() == 0.0) {
+            if (has_normal) {
+                normal = this->normals_[i];
+            } else {
+                normal = Eigen::Vector3d::UnitZ();
+            }
+        }
+        if (has_normal && normal.dot(this->normals_[i]) < 0.0) {
+            normal *= -1.0;
+        }
+        this->normals_[i] = normal;
+    }
+}
+
+void PointCloud::EstimateNormalsKNN(const Eigen::MatrixXi& knn_indices,
+                                    const bool fast_normal_computation)
+{
+    const int num_points = static_cast<int>(this->points_.size());
+
+    const bool has_normal = this->HasNormals();
+    if (!has_normal) {
+        this->normals_.resize(this->points_.size());
+    }
+
+    std::vector<Eigen::Matrix3d> covariances;
+    if (!this->HasCovariances()) {
+        covariances = EstimatePerPointCovariancesKNN(*this, knn_indices);
+    } else {
+        covariances = this->covariances_;
+    }
+
+#pragma omp parallel for schedule(static) \
+    num_threads(utility::EstimateMaxThreads())
+    for (int i = 0; i < num_points; ++i) {
+        auto normal = ComputeNormal(covariances[i], fast_normal_computation);
+        if (normal.squaredNorm() == 0.0) {
+            if (has_normal) {
+                normal = this->normals_[i];
+            } else {
+                normal = Eigen::Vector3d::UnitZ();
+            }
+        }
+        if (has_normal && normal.dot(this->normals_[i]) < 0.0) {
+            normal *= -1.0;
+        }
+        this->normals_[i] = normal;
+    }
+}
+
 void PointCloud::OrientNormalsToAlignWithDirection(
         const Eigen::Vector3d &orientation_reference
         /* = Eigen::Vector3d(0.0, 0.0, 1.0)*/) {
